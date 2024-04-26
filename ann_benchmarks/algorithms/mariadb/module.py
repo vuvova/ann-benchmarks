@@ -248,6 +248,8 @@ class MariaDB(BaseANN):
         self._cur.execute("DROP DATABASE IF EXISTS ann")
         self._cur.execute("CREATE DATABASE ann")
         self._cur.execute("USE ann")
+        self._cur.execute("SET hnsw_max_connection_per_layer = %d" % self._m)
+        self._cur.execute("SET hnsw_ef_constructor = %d" % self._ef_construction)
         # Innodb create table with index is not supported with the latest commit of the develop branch.
         # Once all supported we could use:
         #self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) ENGINE=InnoDB;")
@@ -284,8 +286,7 @@ class MariaDB(BaseANN):
     def set_query_arguments(self, ef_search):
         # Set ef_search
         self._ef_search = ef_search
-        # Not supported by MariaDB at the moment
-        #self._cur.execute("SET hnsw.ef_search = %d" % ef_search)
+        self._cur.execute("SET hnsw_ef_search = %d" % ef_search)
 
     def query(self, v, n):
         self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (bytes(vector_to_hex(v)), n))

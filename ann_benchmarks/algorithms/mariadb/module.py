@@ -25,7 +25,6 @@ class MariaDB(BaseANN):
         self._test_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         self._metric = metric
         self._m = method_param['M']
-        self._ef_construction = method_param['efConstruction']
         self._cur = None
         self._perf_proc = None
         self._perf_records = []
@@ -101,13 +100,16 @@ class MariaDB(BaseANN):
 
         # Command for starting MariaDB server
         self._mariadb_start_cmd = [
+            #'perf','record','-g', '--user-callchains', '--timestamp-filename', '--output=perf.perf',
+            #'rr','record',
             glob.glob(f"{mariadb_root_dir}/*/mariadbd")[0],
             "--no-defaults",
             f"--datadir={data_dir}",
             f"--log_error={log_file}",
             f"--socket={self._socket_file}",
             "--skip_networking",
-            "--skip_grant_tables",
+            "--loose-innodb-buffer-pool-size=16G",
+            "--loose-mhnsw-cache-size=10G",
             "--skip_grant_tables"
         ]
         user_option = MariaDB.get_user_option()
@@ -248,8 +250,8 @@ class MariaDB(BaseANN):
         self._cur.execute("DROP DATABASE IF EXISTS ann")
         self._cur.execute("CREATE DATABASE ann")
         self._cur.execute("USE ann")
-        self._cur.execute("SET hnsw_max_connection_per_layer = %d" % self._m)
-        self._cur.execute("SET hnsw_ef_constructor = %d" % self._ef_construction)
+        self._cur.execute("SET mhnsw_max_edges_per_node = %d" % self._m)
+        self._cur.execute("SET rand_seed1=1, rand_seed2=2")
         # Innodb create table with index is not supported with the latest commit of the develop branch.
         # Once all supported we could use:
         #self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) ENGINE=InnoDB;")
@@ -259,11 +261,15 @@ class MariaDB(BaseANN):
         print("\nInserting data...")
         self.perf_start("inserting")
         start_time = time.time()
+        rps = 10000
         for i, embedding in enumerate(X):
             self._cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i, bytes(vector_to_hex(embedding))))
+            if i % int(rps + 1) == 1:
+                rps=i/(time.time()-start_time)
+                print(f"{i:6d} of {len(X)}, {rps:4.2f} stmt/sec, ETA {(len(X)-i)/rps:.0f} sec")
         self._cur.execute("commit")
         self.perf_stop()
-        print(f"\nInsert time for {X.size} records: {time.time() - start_time}")
+        print(f"\nInsert time for {X.size} records: {time.time() - start_time:7.2f}")
 
         # Create index
         print("\nCreating index...")
@@ -286,7 +292,7 @@ class MariaDB(BaseANN):
     def set_query_arguments(self, ef_search):
         # Set ef_search
         self._ef_search = ef_search
-        self._cur.execute("SET hnsw_ef_search = %d" % ef_search)
+        self._cur.execute("SET mhnsw_limit_multiplier = %d/10" % ef_search)
 
     def query(self, v, n):
         self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (bytes(vector_to_hex(v)), n))
@@ -300,7 +306,7 @@ class MariaDB(BaseANN):
     #      return self._cur.fetchone()[0] / 1024
 
     def __str__(self):
-        return f"MariaDB(m={self._m}, ef_construction={self._ef_construction}, ef_search={self._ef_search})"
+        return f"MariaDB(m={self._m:2d}, ef_search={self._ef_search})"
 
     def done(self):
         # Shutdown MariaDB server when benchmarking done

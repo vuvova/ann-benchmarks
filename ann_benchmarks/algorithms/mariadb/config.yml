@@ -7,11 +7,7 @@ float:
     module: ann_benchmarks.algorithms.mariadb
     name: mariadb
     run_groups:
-      M-50:
-        arg_groups: [{M: 50, efConstruction: 10}]
+      M-24:
+        arg_groups: [{M: [8, 16, 32, 48, 64]}]
         args: {}
-        query_args: [[10]]
-      PGVector-default:
-        arg_groups: [{M: 16, efConstruction: 64}]
-        args: {}
-        query_args: [[40]]
+        query_args: [[10, 20, 30, 40]]

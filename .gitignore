@@ -17,3 +17,8 @@ results/*
 venv
 
 .idea
+
+*.res
+.gdb_history
+.*.swp
+*.png

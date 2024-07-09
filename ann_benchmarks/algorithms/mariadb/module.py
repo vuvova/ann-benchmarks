@@ -60,6 +60,7 @@ class MariaDB(BaseANN):
         self._perf_records = []
         self._perf_stats = []
         self._batch = inspect.stack()[2].frame.f_locals['batch'] # Yo-ho-ho!
+        self._engine = method_param['engine']
 
         if metric == "angular":
             raise RuntimeError(f"Angular metric is not supported.")
@@ -280,10 +281,7 @@ class MariaDB(BaseANN):
         self._cur.execute("DROP DATABASE IF EXISTS ann")
         self._cur.execute("CREATE DATABASE ann")
         self._cur.execute("USE ann")
-        # Innodb create table with index is not supported with the latest commit of the develop branch.
-        # Once all supported we could use:
-        #self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) ENGINE=InnoDB;")
-        self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) ENGINE=MyISAM;")
+        self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) ENGINE=%s" % self._engine)
 
         # Insert data
         print("\nInserting data...")

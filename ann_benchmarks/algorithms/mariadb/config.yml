@@ -8,6 +8,6 @@ float:
     name: mariadb
     run_groups:
       M-24:
-        arg_groups: [{M: [8, 16, 32, 48, 64]}]
+        arg_groups: [{M: [8, 16, 32, 48, 64], engine: 'MyISAM'}]
         args: {}
         query_args: [[10, 20, 30, 40]]

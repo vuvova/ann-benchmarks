@@ -10,10 +10,27 @@ import tempfile
 import time
 from multiprocessing.pool import Pool
 from itertools import chain
+import inspect
 
 import mariadb
 
 from ..base.module import BaseANN
+
+def many_inserts(arg):
+    conn = mariadb.connect(unix_socket=arg[0])
+    cur = conn.cursor()
+    cur.execute("USE ann")
+    cur.execute("SET mhnsw_max_edges_per_node = %d" % arg[1])
+    cur.execute("SET rand_seed1=1, rand_seed2=2")
+    rps = 100
+    lenX= len(arg[3])
+    start_time = time.time()
+    for i, embedding in enumerate(arg[3]):
+        cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[2], bytes(vector_to_hex(embedding))))
+        if arg[2] == 0 and (i + 1) % int(rps + 1) == 0:
+            rps=i/(time.time()-start_time)
+            print(f"{i:6d} of {lenX}, {rps:4.2f} stmt/sec, ETA {(lenX-i)/rps:.0f} sec")
+    cur.execute("commit")
 
 def many_queries(arg):
     conn = mariadb.connect(unix_socket=arg[0])
@@ -42,7 +59,7 @@ class MariaDB(BaseANN):
         self._perf_proc = None
         self._perf_records = []
         self._perf_stats = []
-
+        self._batch = inspect.stack()[2].frame.f_locals['batch'] # Yo-ho-ho!
 
         if metric == "angular":
             raise RuntimeError(f"Angular metric is not supported.")
@@ -263,8 +280,6 @@ class MariaDB(BaseANN):
         self._cur.execute("DROP DATABASE IF EXISTS ann")
         self._cur.execute("CREATE DATABASE ann")
         self._cur.execute("USE ann")
-        self._cur.execute("SET mhnsw_max_edges_per_node = %d" % self._m)
-        self._cur.execute("SET rand_seed1=1, rand_seed2=2")
         # Innodb create table with index is not supported with the latest commit of the develop branch.
         # Once all supported we could use:
         #self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) ENGINE=InnoDB;")
@@ -272,16 +287,27 @@ class MariaDB(BaseANN):
 
         # Insert data
         print("\nInserting data...")
-        self.perf_start("inserting")
+
         start_time = time.time()
-        rps = 10000
-        for i, embedding in enumerate(X):
-            self._cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i, bytes(vector_to_hex(embedding))))
-            if i % int(rps + 1) == 1:
-                rps=i/(time.time()-start_time)
-                print(f"{i:6d} of {len(X)}, {rps:4.2f} stmt/sec, ETA {(len(X)-i)/rps:.0f} sec")
-        self._cur.execute("commit")
-        self.perf_stop()
+        if self._batch:
+            XX=[]
+            for i in range(os.cpu_count()):
+                n = int(len(X)/os.cpu_count()*i)
+                XX.append((self._socket_file, self._m, n, X[n:int(len(X)/os.cpu_count()*(i+1))]))
+            pool = Pool()
+            self._res = pool.map(many_inserts, XX)
+        else:
+            self.perf_start("inserting")
+            self._cur.execute("SET mhnsw_max_edges_per_node = %d" % self._m)
+            self._cur.execute("SET rand_seed1=1, rand_seed2=2")
+            rps = 1000
+            for i, embedding in enumerate(X):
+                self._cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i, bytes(vector_to_hex(embedding))))
+                if (i + 1) % int(rps + 1) == 0:
+                    rps=i/(time.time()-start_time)
+                    print(f"{i:6d} of {len(X)}, {rps:4.2f} stmt/sec, ETA {(len(X)-i)/rps:.0f} sec")
+            self._cur.execute("commit")
+            self.perf_stop()
         print(f"\nInsert time for {X.size} records: {time.time() - start_time:7.2f}")
 
         # Create index

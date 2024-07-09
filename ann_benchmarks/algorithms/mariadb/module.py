@@ -8,10 +8,23 @@ import subprocess
 import sys
 import tempfile
 import time
+from multiprocessing.pool import Pool
+from itertools import chain
 
 import mariadb
 
 from ..base.module import BaseANN
+
+def many_queries(arg):
+    conn = mariadb.connect(unix_socket=arg[0])
+    cur = conn.cursor()
+    cur.execute("SET mhnsw_limit_multiplier = %d/10" % arg[1])
+    cur.execute("USE ann")
+    res = []
+    for v in arg[3]:
+        cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (bytes(vector_to_hex(v)), arg[2]))
+        res.append([id for id, in cur.fetchall()])
+    return res
 
 def vector_to_hex(v):
     binary_data = bytearray(v.size * 4)
@@ -304,6 +317,18 @@ class MariaDB(BaseANN):
     #         return 0
     #      self._cur.execute("")
     #      return self._cur.fetchone()[0] / 1024
+
+    def batch_query(self, X, n):
+        ef = self._ef_search
+
+        XX=[]
+        for i in range(os.cpu_count()):
+            XX.append((self._socket_file, self._ef_search, n, X[int(len(X)/os.cpu_count()*i):int(len(X)/os.cpu_count()*(i+1))]))
+        pool = Pool()
+        self._res = pool.map(many_queries, XX)
+
+    def get_batch_results(self):
+        return chain(*self._res)
 
     def __str__(self):
         return f"MariaDB(m={self._m:2d}, ef_search={self._ef_search})"

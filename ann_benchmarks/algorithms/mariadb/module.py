@@ -26,7 +26,13 @@ def many_inserts(arg):
     lenX= len(arg[3])
     start_time = time.time()
     for i, embedding in enumerate(arg[3]):
-        cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[2], bytes(vector_to_hex(embedding))))
+        while True:
+            try:
+                cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[2], bytes(vector_to_hex(embedding))))
+                break
+            except mariadb.OperationalError:
+                time.sleep(0.01*(11+arg[2]*17%13))
+                pass
         if arg[2] == 0 and (i + 1) % int(rps + 1) == 0:
             rps=i/(time.time()-start_time)
             print(f"{i:6d} of {lenX}, {rps:4.2f} stmt/sec, ETA {(lenX-i)/rps:.0f} sec")

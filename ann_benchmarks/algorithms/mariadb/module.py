@@ -20,20 +20,19 @@ def many_inserts(arg):
     conn = mariadb.connect(unix_socket=arg[0])
     cur = conn.cursor()
     cur.execute("USE ann")
-    cur.execute("SET mhnsw_max_edges_per_node = %d" % arg[1])
     cur.execute("SET rand_seed1=1, rand_seed2=2")
     rps = 100
-    lenX= len(arg[3])
+    lenX= len(arg[2])
     start_time = time.time()
-    for i, embedding in enumerate(arg[3]):
+    for i, embedding in enumerate(arg[2]):
         while True:
             try:
-                cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[2], bytes(vector_to_hex(embedding))))
+                cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[1], bytes(vector_to_hex(embedding))))
                 break
             except mariadb.OperationalError:
-                time.sleep(0.01*(11+arg[2]*17%13))
+                time.sleep(0.01*(11+arg[1]*17%13))
                 pass
-        if arg[2] == 0 and (i + 1) % int(rps + 1) == 0:
+        if arg[1] == 0 and (i + 1) % int(rps + 1) == 0:
             rps=i/(time.time()-start_time)
             print(f"{i:6d} of {lenX}, {rps:4.2f} stmt/sec, ETA {(lenX-i)/rps:.0f} sec")
     cur.execute("commit")
@@ -138,7 +137,7 @@ class MariaDB(BaseANN):
         # Command for starting MariaDB server
         self._mariadb_start_cmd = [
             #'perf','record','-g', '--user-callchains', '--timestamp-filename', '--output=perf.perf',
-            #'rr','record',
+            #'rr','record','-h',
             glob.glob(f"{mariadb_root_dir}/*/mariadbd")[0],
             "--no-defaults",
             f"--datadir={data_dir}",
@@ -147,6 +146,7 @@ class MariaDB(BaseANN):
             "--skip_networking",
             "--loose-innodb-buffer-pool-size=16G",
             "--loose-mhnsw-cache-size=10G",
+            f"--mhnsw_max_edges_per_node={self._m}",
             "--skip_grant_tables"
         ]
         user_option = MariaDB.get_user_option()
@@ -297,12 +297,11 @@ class MariaDB(BaseANN):
             XX=[]
             for i in range(os.cpu_count()):
                 n = int(len(X)/os.cpu_count()*i)
-                XX.append((self._socket_file, self._m, n, X[n:int(len(X)/os.cpu_count()*(i+1))]))
+                XX.append((self._socket_file, n, X[n:int(len(X)/os.cpu_count()*(i+1))]))
             pool = Pool()
             self._res = pool.map(many_inserts, XX)
         else:
             self.perf_start("inserting")
-            self._cur.execute("SET mhnsw_max_edges_per_node = %d" % self._m)
             self._cur.execute("SET rand_seed1=1, rand_seed2=2")
             rps = 1000
             for i, embedding in enumerate(X):

@@ -303,12 +303,16 @@ class MariaDB(BaseANN):
         else:
             self.perf_start("inserting")
             self._cur.execute("SET rand_seed1=1, rand_seed2=2")
-            rps = 1000
+            rps, rows, last, total=1000, 0, time.time(), 1
             for i, embedding in enumerate(X):
                 self._cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i, bytes(vector_to_hex(embedding))))
-                if (i + 1) % int(rps + 1) == 0:
-                    rps=i/(time.time()-start_time)
-                    print(f"{i:6d} of {len(X)}, {rps:4.2f} stmt/sec, ETA {(len(X)-i)/rps:.0f} sec")
+                if i - rows > rps:
+                    now=time.time()
+                    rps=((i-rows)/(now-last) + 19*rps)/20
+                    eta=(len(X)-i)/rps
+                    total=now-start_time+eta
+                    last, rows=now, i
+                    print(f"{i:6d} of {len(X)}, {rps:4.2f} stmt/sec ETA {eta:.0f} of {total:.0f} sec")
             self._cur.execute("commit")
             self.perf_stop()
         print(f"\nInsert time for {X.size} records: {time.time() - start_time:7.2f}")

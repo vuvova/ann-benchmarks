@@ -66,6 +66,7 @@ class MariaDB(BaseANN):
         self._perf_stats = []
         self._batch = inspect.stack()[2].frame.f_locals['batch'] # Yo-ho-ho!
         self._engine = method_param['engine']
+        self._size = 0
 
         if metric == "angular":
             raise RuntimeError(f"Angular metric is not supported.")
@@ -331,9 +332,12 @@ class MariaDB(BaseANN):
         else:
             pass
         self.perf_stop()
-        print("\nIndex creation time:", time.time() - start_time)
-        self.perf_start("searching")
 
+        stem = os.environ.get('MARIADB_DB_WORKSPACE') + '/data/ann/t1#i#01.'
+        for f in glob.glob(stem + 'ibd') + glob.glob(stem + 'MY[ID]'):
+            self._size += os.stat(f).st_size
+
+        self.perf_start("searching")
 
     def set_query_arguments(self, ef_search):
         # Set ef_search
@@ -344,12 +348,8 @@ class MariaDB(BaseANN):
         self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (bytes(vector_to_hex(v)), n))
         return [id for id, in self._cur.fetchall()]
 
-    # TODO for MariaDB, get the memory usage when index is supported:
-    # def get_memory_usage(self):
-    #      if self._cur is None:
-    #         return 0
-    #      self._cur.execute("")
-    #      return self._cur.fetchone()[0] / 1024
+    def get_memory_usage(self):
+        return self._size/1024 # kB
 
     def batch_query(self, X, n):
         ef = self._ef_search

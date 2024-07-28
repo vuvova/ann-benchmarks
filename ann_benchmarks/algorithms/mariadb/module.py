@@ -11,6 +11,7 @@ import time
 from multiprocessing.pool import Pool
 from itertools import chain
 import inspect
+import numpy
 
 import mariadb
 
@@ -27,7 +28,7 @@ def many_inserts(arg):
     for i, embedding in enumerate(arg[2]):
         while True:
             try:
-                cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[1], bytes(vector_to_hex(embedding))))
+                cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i+arg[1], vector_to_hex(embedding)))
                 break
             except mariadb.OperationalError:
                 time.sleep(0.01*(11+arg[1]*17%13))
@@ -44,15 +45,12 @@ def many_queries(arg):
     cur.execute("USE ann")
     res = []
     for v in arg[3]:
-        cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (bytes(vector_to_hex(v)), arg[2]))
+        cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (vector_to_hex(v), arg[2]))
         res.append([id for id, in cur.fetchall()])
     return res
 
 def vector_to_hex(v):
-    binary_data = bytearray(v.size * 4)
-    for index, f in enumerate(v):
-        struct.pack_into('f', binary_data, index * 4, f)
-    return binary_data
+    return numpy.array(v, 'float32').tobytes()
 
 class MariaDB(BaseANN):
 
@@ -306,7 +304,7 @@ class MariaDB(BaseANN):
             self._cur.execute("SET rand_seed1=1, rand_seed2=2")
             rps, rows, last, total=1000, 0, time.time(), 1
             for i, embedding in enumerate(X):
-                self._cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i, bytes(vector_to_hex(embedding))))
+                self._cur.execute("INSERT INTO t1 (id, v) VALUES (%d, %s)", (i, vector_to_hex(embedding)))
                 if i - rows > rps:
                     now=time.time()
                     rps=((i-rows)/(now-last) + 19*rps)/20
@@ -345,7 +343,7 @@ class MariaDB(BaseANN):
         self._cur.execute("SET mhnsw_limit_multiplier = %d/10" % ef_search)
 
     def query(self, v, n):
-        self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (bytes(vector_to_hex(v)), n))
+        self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (vector_to_hex(v), n))
         return [id for id, in self._cur.fetchall()]
 
     def get_memory_usage(self):

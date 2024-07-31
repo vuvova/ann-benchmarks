@@ -41,7 +41,7 @@ def many_inserts(arg):
 def many_queries(arg):
     conn = mariadb.connect(unix_socket=arg[0])
     cur = conn.cursor()
-    cur.execute("SET mhnsw_limit_multiplier = %d/10" % arg[1])
+    cur.execute("SET mhnsw_min_limit = %d" % arg[1])
     cur.execute("USE ann")
     res = []
     for v in arg[3]:
@@ -340,7 +340,7 @@ class MariaDB(BaseANN):
     def set_query_arguments(self, ef_search):
         # Set ef_search
         self._ef_search = ef_search
-        self._cur.execute("SET mhnsw_limit_multiplier = %d/10" % ef_search)
+        self._cur.execute("SET mhnsw_min_limit = %d" % ef_search)
 
     def query(self, v, n):
         self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (vector_to_hex(v), n))

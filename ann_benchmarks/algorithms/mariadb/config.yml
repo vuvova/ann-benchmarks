@@ -7,7 +7,11 @@ float:
     module: ann_benchmarks.algorithms.mariadb
     name: mariadb
     run_groups:
-      M-24:
-        arg_groups: [{M: [8, 16, 32, 48, 64], engine: 'MyISAM'}]
+      normal:
+        arg_groups: [{txt: 'orig', M: [3, 4, 5, 6, 8, 16, 32, 48], engine: 'MyISAM'}]
         args: {}
         query_args: [[10, 20, 30, 40]]
+      large-ef: # slow, use --run 1, the search is deterministic anyway
+        arg_groups: [{txt: 'orig', M: [3,4,5,6,8,12], engine: 'MyISAM'}]
+        args: {}
+        query_args: [[800,1200]]

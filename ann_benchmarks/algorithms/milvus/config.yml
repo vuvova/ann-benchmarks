@@ -5,7 +5,7 @@ float:
     disabled: false
     docker_tag: ann-benchmarks-milvus
     module: ann_benchmarks.algorithms.milvus
-    name: Milvus(Knowhere)
+    name: milvus
     run_groups:
       HNSW:
         args:

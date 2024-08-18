@@ -573,7 +573,11 @@ def dbpedia_entities_openai_1M(out_fn, n = None):
 DATASETS: Dict[str, Callable[[str], None]] = {
     "deep-image-96-angular": deep_image,
     "fashion-mnist-784-euclidean": fashion_mnist,
-    "gist-960-euclidean": gist,
+    "gist-2l-960-euclidean": None, # 200_000 or 2 lakh
+    "gist-4l-960-euclidean": None, # 400_000 etc
+    "gist-6l-960-euclidean": None, # 600_000
+    "gist-8l-960-euclidean": None, # 800_000
+    "gist-960-euclidean": gist,    # 1_000_000
     "glove-25-angular": lambda out_fn: glove(out_fn, 25),
     "glove-50-angular": lambda out_fn: glove(out_fn, 50),
     "glove-100-angular": lambda out_fn: glove(out_fn, 100),

@@ -1,5 +1,5 @@
 float:
-  euclidean:
+  any:
   - base_args: ['@metric']
     constructor: MariaDB
     disabled: false
@@ -8,10 +8,10 @@ float:
     name: mariadb
     run_groups:
       normal:
-        arg_groups: [{txt: 'orig', M: [3, 4, 5, 6, 8, 16, 32, 48], engine: 'MyISAM'}]
+        arg_groups: [{txt: 'test', M: [4, 5, 6, 8, 12, 16, 32, 48], engine: 'MyISAM'}]
         args: {}
         query_args: [[10, 20, 30, 40]]
-      large-ef: # slow, use --run 1, the search is deterministic anyway
-        arg_groups: [{txt: 'orig', M: [3,4,5,6,8,12], engine: 'MyISAM'}]
-        args: {}
-        query_args: [[800,1200]]
+      #large-ef: # slow, use --run 1, the search is deterministic anyway
+      #  arg_groups: [{txt: 'orig', M: [3,4,5,6,8,12], engine: 'MyISAM'}]
+      #  args: {}
+      #  query_args: [[800,1200]]

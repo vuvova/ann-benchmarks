@@ -44,8 +44,8 @@ def many_queries(arg):
     cur.execute("SET mhnsw_min_limit = %d" % arg[1])
     cur.execute("USE ann")
     res = []
-    for v in arg[3]:
-        cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (vector_to_hex(v), arg[2]))
+    for v in arg[4]:
+        cur.execute(f"SELECT id FROM t1 ORDER by vec_distance_{arg[2]}(v, %s) LIMIT %d", (vector_to_hex(v), arg[3]))
         res.append([id for id, in cur.fetchall()])
     return res
 
@@ -67,10 +67,9 @@ class MariaDB(BaseANN):
         self._size = 0
 
         if metric == "angular":
-            raise RuntimeError(f"Angular metric is not supported.")
+            self._metric='cosine'
         elif metric == "euclidean":
-            # euclidean is the current default and only distance metric supported by MariaDB
-            pass
+            self._metric='euclidean'
         else:
             raise RuntimeError(f"unknown metric {metric}")
         
@@ -286,7 +285,13 @@ class MariaDB(BaseANN):
         self._cur.execute("DROP DATABASE IF EXISTS ann")
         self._cur.execute("CREATE DATABASE ann")
         self._cur.execute("USE ann")
-        self._cur.execute("CREATE TABLE t1 (id INT PRIMARY KEY, v BLOB NOT NULL, vector INDEX (v)) MIN_ROWS=%d ENGINE=%s" % (len(X), self._engine))
+        self._cur.execute(f"""
+          CREATE TABLE t1 (
+            id INT PRIMARY KEY,
+            v BLOB NOT NULL,
+            VECTOR INDEX (v) DISTANCE_FUNCTION={self._metric}
+          ) MIN_ROWS={len(X)} ENGINE={self._engine}
+        """)
 
         # Insert data
         print("\nInserting data...")
@@ -343,7 +348,7 @@ class MariaDB(BaseANN):
         self._cur.execute("SET mhnsw_min_limit = %d" % ef_search)
 
     def query(self, v, n):
-        self._cur.execute("SELECT id FROM t1 ORDER by vec_distance(v, %s) LIMIT %d", (vector_to_hex(v), n))
+        self._cur.execute(f"SELECT id FROM t1 ORDER by vec_distance_{self._metric}(v, %s) LIMIT %d", (vector_to_hex(v), n))
         return [id for id, in self._cur.fetchall()]
 
     def get_memory_usage(self):
@@ -354,7 +359,7 @@ class MariaDB(BaseANN):
 
         XX=[]
         for i in range(os.cpu_count()):
-            XX.append((self._socket_file, self._ef_search, n, X[int(len(X)/os.cpu_count()*i):int(len(X)/os.cpu_count()*(i+1))]))
+            XX.append((self._socket_file, self._ef_search, self._metric, n, X[int(len(X)/os.cpu_count()*i):int(len(X)/os.cpu_count()*(i+1))]))
         pool = Pool()
         self._res = pool.map(many_queries, XX)
 

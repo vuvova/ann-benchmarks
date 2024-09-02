@@ -372,6 +372,7 @@ class MariaDB(BaseANN):
     def done(self):
         # Shutdown MariaDB server when benchmarking done
         self._cur.execute("shutdown")
+        self._mariadbd_proc.wait(300)
         # Stop perf for searching and do final analysis
         self.perf_stop()
         self.perf_analysis()

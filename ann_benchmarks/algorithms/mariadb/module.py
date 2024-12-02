@@ -112,7 +112,8 @@ class MariaDB(BaseANN):
         os.makedirs(f"{data_dir}", exist_ok=True)
 
         # Generate a socket file name under /tmp to make sure the file path is always under 107 character, to avoid "The socket file path is too long" error
-        self._socket_file = tempfile.mktemp(prefix='mysql_', suffix='.sock', dir='/tmp')
+        dset=inspect.stack()[3].frame.f_locals['dataset_name'] + '-'
+        self._socket_file = tempfile.mktemp(prefix=dset, suffix='.sock', dir='/tmp')
 
         print("\nSetup paths:")
         print(f"MARIADB_ROOT_DIR: {mariadb_root_dir}")
@@ -288,7 +289,7 @@ class MariaDB(BaseANN):
         self._cur.execute(f"""
           CREATE TABLE t1 (
             id INT PRIMARY KEY,
-            v BLOB NOT NULL,
+            v VECTOR({len(X[0])}) NOT NULL,
             VECTOR INDEX (v) DISTANCE_FUNCTION={self._metric}
           ) MIN_ROWS={len(X)} ENGINE={self._engine}
         """)
@@ -316,10 +317,10 @@ class MariaDB(BaseANN):
                     eta=(len(X)-i)/rps
                     total=now-start_time+eta
                     last, rows=now, i
-                    print(f"{i:6d} of {len(X)}, {rps:4.2f} stmt/sec ETA {eta:.0f} of {total:.0f} sec")
+                    print(f"{i:6_} of {len(X):_}, {rps:4.2f} stmt/sec ETA {eta:.0f} of {total:.0f} sec")
             self._cur.execute("commit")
             self.perf_stop()
-        print(f"\nInsert time for {X.size} records: {time.time() - start_time:7.2f}")
+        print(f"\nInsert time for {X.size:_} records: {time.time() - start_time:7.2f}")
 
         # Create index
         print("\nCreating index...")

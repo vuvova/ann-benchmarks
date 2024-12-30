@@ -5,30 +5,39 @@ import sys
 import random
 
 if len(sys.argv) < 4:
-    print("Usage: shrink-dataset.py from.hdf5 to.hdf5 rows")
+    print("Usage: shrink-dataset.py from.hdf5 to.hdf5 rows [neighbors]")
+    exit()
 
 fnfrom=sys.argv[1]
 fnto=sys.argv[2]
 rows=int(sys.argv[3])
+if len(sys.argv) < 5:
+    neighbors=rows
+else:
+    neighbors=int(sys.argv[4])
 
 f=h5py.File(fnfrom)
 fto=h5py.File(fnto, 'x')
+
+neighbors = min(neighbors, len(f['neighbors'][0]))
 
 # assuming one attribute "distance" on /, no groups,
 # and four datasets "distances", "neighbors", "test", "train"
 
 print("Copying attributes, distances, and test")
 fto.attrs["distance"]=f.attrs["distance"]
-for dset in ("distances", "test"):
-    fto.create_dataset_like(dset, f[dset], data=f[dset])
+fto.create_dataset_like("test", f["test"], data=f["test"])
+fto.create_dataset_like("distances", f["distances"], data=f["distances"][:,:neighbors],
+                        shape=(len(f["distances"]), neighbors))
 
 d=fto.create_dataset_like("train", f["train"], shape=(rows, len(f["train"][0])))
-n=fto.create_dataset_like("neighbors", f["neighbors"])
+n=fto.create_dataset_like("neighbors", f["neighbors"],
+                          shape=(len(f["neighbors"]), neighbors))
 
 print("Collecting neighbors")
 s=set()
 for i in f["neighbors"]:
-    for j in i:
+    for j in i[:neighbors]:
         s.add(j)
 
 if rows < len(s):
@@ -50,4 +59,4 @@ for i in range(len(s)):
 
 print("Copying neighbors")
 for i in range(len(f["neighbors"])):
-    n[i] = [reverse[x] for x in f["neighbors"][i]]
+    n[i] = [reverse[x] for x in f["neighbors"][i][:neighbors]]

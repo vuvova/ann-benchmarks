@@ -41,7 +41,7 @@ def many_inserts(arg):
 def many_queries(arg):
     conn = mariadb.connect(unix_socket=arg[0])
     cur = conn.cursor()
-    cur.execute("SET mhnsw_min_limit = %d" % arg[1])
+    cur.execute("SET mhnsw_ef_search = %d" % arg[1])
     cur.execute("USE ann")
     res = []
     for v in arg[4]:
@@ -145,7 +145,7 @@ class MariaDB(BaseANN):
             "--skip_networking",
             "--loose-innodb-buffer-pool-size=16G",
             "--loose-mhnsw-cache-size=10G",
-            f"--mhnsw_max_edges_per_node={self._m}",
+            f"--mhnsw_default_m={self._m}",
             "--skip_grant_tables"
         ]
         user_option = MariaDB.get_user_option()
@@ -346,7 +346,7 @@ class MariaDB(BaseANN):
     def set_query_arguments(self, ef_search):
         # Set ef_search
         self._ef_search = ef_search
-        self._cur.execute("SET mhnsw_min_limit = %d" % ef_search)
+        self._cur.execute("SET mhnsw_ef_search = %d" % ef_search)
 
     def query(self, v, n):
         self._cur.execute(f"SELECT id FROM t1 ORDER by vec_distance_{self._metric}(v, %s) LIMIT %d", (vector_to_hex(v), n))

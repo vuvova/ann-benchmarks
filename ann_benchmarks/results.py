@@ -84,7 +84,7 @@ def load_all_results(dataset: Optional[str] = None,
     Yields:
         tuple: A tuple containing properties as a dictionary and an h5py file object.
     """
-    for root, _, files in os.walk(build_result_filepath(dataset, count)):
+    for root, _, files in os.walk(build_result_filepath(dataset, count), followlinks=True):
         for filename in files:
             if os.path.splitext(filename)[-1] != ".hdf5":
                 continue
@@ -94,6 +94,8 @@ def load_all_results(dataset: Optional[str] = None,
                     if batch_mode != properties["batch_mode"]:
                         continue
                     yield properties, f
+            except PermissionError:
+                pass
             except Exception:
                 print(f"Was unable to read {filename}")
                 traceback.print_exc()

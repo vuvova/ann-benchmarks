@@ -144,7 +144,7 @@ class MariaDB(BaseANN):
             f"--socket={self._socket_file}",
             "--skip_networking",
             "--loose-innodb-buffer-pool-size=16G",
-            "--loose-mhnsw-cache-size=10G",
+            "--loose-mhnsw-max-cache-size=10G",
             f"--mhnsw_default_m={self._m}",
             "--skip_grant_tables"
         ]
@@ -290,8 +290,8 @@ class MariaDB(BaseANN):
           CREATE TABLE t1 (
             id INT PRIMARY KEY,
             v VECTOR({len(X[0])}) NOT NULL,
-            VECTOR INDEX (v) DISTANCE_FUNCTION={self._metric}
-          ) MIN_ROWS={len(X)} ENGINE={self._engine}
+            VECTOR INDEX (v) DISTANCE={self._metric}
+          ) ENGINE={self._engine}
         """)
 
         # Insert data
@@ -341,6 +341,7 @@ class MariaDB(BaseANN):
         for f in glob.glob(stem + 'ibd') + glob.glob(stem + 'MY[ID]'):
             self._size += os.stat(f).st_size
 
+        #self._cur.execute("FLUSH TABLES")
         self.perf_start("searching")
 
     def set_query_arguments(self, ef_search):
